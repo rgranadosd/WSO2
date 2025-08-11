@@ -1,0 +1,59 @@
+{
+  "name": "@asgardeo/vue-app",
+  "version": "5.2.3",
+  "description": "Vue.js based sample SPA to demonstrate Asgardeo / WSO2 Identity Server Auth Vue SDK usage",
+  "keywords": [
+    "Asgardeo",
+    "WSO2",
+    "WSO2 IS",
+    "WSO2 Identity Server",
+    "OIDC",
+    "SDK",
+    "Vue",
+    "Vue.js",
+    "Single Page Application",
+    "SPA",
+    "Sample",
+    "Javascript",
+    "Typescript",
+    "Authenticate"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asgardeo/asgardeo-vue-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/asgardeo/asgardeo-vue-sdk/issues"
+  },
+  "homepage": "https://github.com/asgardeo/asgardeo-vue-sdk#readme",
+  "author": "WSO2",
+  "license": "Apache-2.0",
+  "private": false,
+  "scripts": {
+    "start": "webpack-dev-server --mode development --hot --open",
+    "prebuild": "npm install",
+    "build": "webpack"
+  },
+  "dependencies": {
+    "@asgardeo/auth-spa": "^3.3.0",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.4"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.5",
+    "@babel/preset-env": "^7.20.2",
+    "@babel/preset-typescript": "^7.18.6",
+    "@vue/compiler-sfc": "^3.3.4",
+    "babel-loader": "^9.1.0",
+    "css-loader": "^6.7.3",
+    "file-loader": "^6.2.0",
+    "html-webpack-plugin": "^5.5.0",
+    "style-loader": "^3.3.1",
+    "typescript": "^4.9.4",
+    "url-loader": "^4.1.1",
+    "vue-loader": "^17.2.2",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1",
+    "webpack-dev-server": "^4.11.1"
+  }
+}

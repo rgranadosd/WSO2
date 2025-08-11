@@ -1,0 +1,14 @@
+{
+  "clientID": "lMngvqozKpfmEWC9D_D3O8yuYfAa",
+  "baseUrl": "https://localhost:9443",
+  "signInRedirectURL": "https://localhost:3000/auth/callback",
+  "signOutRedirectURL": "https://localhost:3000",
+  "scope": ["openid", "profile", "email", "address", "phone"],
+  "enableOIDCSessionManagement": true,
+  "checkSessionInterval": 3,
+  "environment": "production",
+  "enableDebugMode": true,
+  "enableHotReload": true,
+  "enableErrorBoundary": true,
+  "enableTypeChecking": true
+}
