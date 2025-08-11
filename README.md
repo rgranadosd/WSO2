@@ -1,54 +1,54 @@
 # WSO2 Project
 
-Este es un proyecto WSO2 que incluye la estructura de directorios necesaria para el desarrollo y despliegue de servicios.
+This is a WSO2 project that includes the necessary directory structure for service development and deployment.
 
-## Estructura del Proyecto
+## Project Structure
 
 ```
 WSO2/
 ├── IS/                    # WSO2 Identity Server
-├── .gitignore            # Archivos ignorados por Git
-└── README.md             # Este archivo
+├── .gitignore            # Files ignored by Git
+└── README.md             # This file
 ```
 
-## Descripción
+## Description
 
-Este proyecto contiene la configuración y estructura necesaria para trabajar con productos WSO2, específicamente el WSO2 Identity Server (IS).
+This project contains the configuration and structure necessary to work with WSO2 products, specifically the WSO2 Identity Server (IS).
 
-## Requisitos
+## Requirements
 
-- Java 8 o superior
-- Maven 3.6+ o Gradle 6+
+- Java 8 or higher
+- Maven 3.6+ or Gradle 6+
 - Git
 
-## Instalación
+## Installation
 
-1. Clona el repositorio:
+1. Clone the repository:
    ```bash
-   git clone <url-del-repositorio>
+   git clone <repository-url>
    cd WSO2
    ```
 
-2. Configura las variables de entorno necesarias
+2. Configure the necessary environment variables
 
-3. Ejecuta el proyecto según la documentación específica de cada módulo
+3. Run the project according to the specific documentation of each module
 
-## Configuración
+## Configuration
 
-Los archivos de configuración se encuentran en los directorios correspondientes de cada módulo. Asegúrate de revisar la documentación específica de cada producto WSO2.
+Configuration files are located in the corresponding directories of each module. Make sure to review the specific documentation of each WSO2 product.
 
-## Contribución
+## Contributing
 
-1. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
-2. Realiza tus cambios
-3. Haz commit de tus cambios (`git commit -am 'Añade nueva funcionalidad'`)
-4. Haz push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Crea un Pull Request
+1. Create a branch for your feature (`git checkout -b feature/new-feature`)
+2. Make your changes
+3. Commit your changes (`git commit -am 'Add new feature'`)
+4. Push to the branch (`git push origin feature/new-feature`)
+5. Create a Pull Request
 
-## Licencia
+## License
 
-Este proyecto está bajo la licencia Apache 2.0. Ver el archivo [LICENSE](LICENSE) para más detalles.
+This project is under the Apache 2.0 License. See the [LICENSE](LICENSE) file for more details.
 
-## Contacto
+## Contact
 
-Para más información sobre este proyecto, consulta la documentación oficial de WSO2 o contacta al equipo de desarrollo.
+For more information about this project, consult the official WSO2 documentation or contact the development team.
