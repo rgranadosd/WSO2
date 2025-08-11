@@ -47,7 +47,7 @@ Los archivos de configuración se encuentran en los directorios correspondientes
 
 ## Licencia
 
-Este proyecto está bajo la licencia Apache 2.0.
+Este proyecto está bajo la licencia Apache 2.0. Ver el archivo [LICENSE](LICENSE) para más detalles.
 
 ## Contacto
 
