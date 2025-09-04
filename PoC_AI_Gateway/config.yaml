@@ -1,0 +1,13 @@
+providers:
+  OPENAI:
+    TOKEN_URL: "http://your-wso2-server"
+    CONSUMER_KEY: "your_consumer_key_here"
+    CONSUMER_SECRET: "your_consumer_secret_here"
+    WSO2_GATEWAY_URL: "http://your-wso2-server"
+    MODEL: "gpt-4o"
+  MISTRAL:
+    TOKEN_URL: "http://your-wso2-server"
+    CONSUMER_KEY: "your_consumer_key_here"
+    CONSUMER_SECRET: "your_consumer_secret_here"
+    WSO2_GATEWAY_URL: "http://your-wso2-server"    
+    MODEL: "mistral-tiny" 

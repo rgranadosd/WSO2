@@ -19,13 +19,21 @@ This repository is designed to be the central location for all WSO2-related sour
 WSO2/
 ├── IS/                                    # WSO2 Identity Server
 │   └── spa-vue-app-msft/                 # Vue.js SPA Application for Microsoft
-│       ├── README-project.md              # Project overview documentation
 │       ├── README.md                      # Application-specific documentation
 │       ├── LICENSE                        # Apache 2.0 License
 │       ├── package.json                   # Node.js dependencies
 │       ├── src/                           # Source code
-│       ├── dist/                          # Build output
-│       └── build.sh                       # Build script
+│       ├── build.sh                       # Build script
+│       └── start.sh                       # Start script
+├── PoC_AI_Gateway/                        # AI Gateway Proof of Concept
+│   ├── README.md                          # Project documentation
+│   ├── package.json                       # Node.js dependencies
+│   ├── config.yaml                        # Configuration file
+│   ├── tesing.py                          # Streamlit application
+│   ├── mcp-client.js                      # MCP client implementation
+│   ├── mcp-http-proxy.js                  # HTTP proxy for MCP
+│   ├── startgw.sh                         # Gateway start script
+│   └── start_test.sh                      # Test start script
 ├── .gitignore                             # Files ignored by Git
 └── README.md                              # This file (repository overview)
 ```
@@ -38,6 +46,12 @@ WSO2/
   - Integration with WSO2 Identity Server for Microsoft authentication
   - Complete authentication flow implementation
   - Production-ready build system with Webpack
+
+### AI Gateway Proof of Concept (PoC_AI_Gateway)
+- **Guardrails Testing Client** (`PoC_AI_Gateway/`)
+  - Streamlit-based web interface for testing AI guardrails
+  - Custom client designed specifically for guardrails validation
+  - Support for multiple AI providers 
 
 ## Adding New WSO2 Projects
 
@@ -74,6 +88,7 @@ WSO2/
 
 - **Java 8 or higher** (for WSO2 server components)
 - **Node.js 16+** (for JavaScript/TypeScript applications)
+- **Python 3.8+** (for AI Gateway and Streamlit applications)
 - **Maven 3.6+ or Gradle 6+** (for Java-based projects)
 - **Git** (for version control)
 
@@ -90,11 +105,16 @@ WSO2/
    # For Vue.js application
    cd IS/spa-vue-app-msft
    
+   # For AI Gateway application
+   cd PoC_AI_Gateway
+   
    # For other projects (when added)
    cd <PRODUCT>/<PROJECT_NAME>
    ```
 
-3. **Follow project-specific setup instructions** in each project's README.md
+3. **Follow project-specific setup instructions** in each project's README.md:
+   - **Vue.js SPA**: See `IS/spa-vue-app-msft/README.md` for authentication setup
+   - **AI Gateway**: See `PoC_AI_Gateway/README.md` for guardrails testing and LLM provider configuration
 
 ## Contributing
 

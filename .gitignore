@@ -58,6 +58,12 @@ jspm_packages/
 .env.test
 .env.production
 
+# Python virtual environments
+venv/
+env/
+.venv/
+.env/
+
 # WSO2 specific files
 *.car
 *.jar
