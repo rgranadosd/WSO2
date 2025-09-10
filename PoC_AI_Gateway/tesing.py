@@ -7,21 +7,37 @@ import json
 import yaml
 
 # ------------------------------
+# Localisation import
+# ------------------------------
+from localization import t, set_lang, get_lang
+
+# ------------------------------
 # Script para llamar a OpenAI vía WSO2
 # ------------------------------
 
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
-def validate_provider_config(provider_config, required_fields):
+def validate_provider_config(provider_config, required_fields, lang):
     missing = [field for field in required_fields if field not in provider_config]
     if missing:
-        st.error(f"Faltan los siguientes campos en la configuración del proveedor: {', '.join(missing)}")
+        st.error(t('missing_fields', lang, fields=", ".join(missing)))
         st.stop()
+
+
+
+# ------------------------------
+# Language selector (with fallback)
+# ------------------------------
+if hasattr(st, 'sidebar'):
+    lang = st.sidebar.selectbox("🌐 Language / Idioma", ["en", "es"], format_func=lambda l: {"en": "English", "es": "Español"}[l])
+else:
+    lang = 'en'
+set_lang(lang)
 
 required_fields = ["TOKEN_URL", "CONSUMER_KEY", "CONSUMER_SECRET", "WSO2_GATEWAY_URL"]
 for prov in config["providers"]:
-    validate_provider_config(config["providers"][prov], required_fields)
+    validate_provider_config(config["providers"][prov], required_fields, get_lang())
 
 # Inicialización de contadores para todos los proveedores definidos en el YAML
 provider_keys = list(config["providers"].keys())
@@ -31,11 +47,12 @@ for prov in provider_keys:
     if f"{prov}_error" not in st.session_state:
         st.session_state[f"{prov}_error"] = 0
 
+
 # Banner superior con logo WSO2 y colores corporativos
-display_banner = """
+display_banner = f"""
 <div style='background-color:#fff;padding:18px 0 10px 0;display:flex;align-items:center;justify-content:center;border-bottom:2px solid #FF5000;'>
     <img src='https://wso2.cachefly.net/wso2/sites/all/2023/images/webp/wso2-logo.webp' alt='WSO2 Logo' style='height:44px;margin-right:24px;'>
-    <span style='color:#232323;font-size:2.2rem;font-weight:bold;letter-spacing:1px;'>WSO2 API Manager - LLM Gateway</span>
+    <span style='color:#232323;font-size:2.2rem;font-weight:bold;letter-spacing:1px;'>{t('title')}</span>
 </div>
 """
 st.markdown(display_banner, unsafe_allow_html=True)
@@ -92,22 +109,24 @@ st.markdown(
 
 st.markdown("<hr style='margin:0 0 20px 0;border:1px solid #eee;'>", unsafe_allow_html=True)
 
+
 # Contadores dinámicos con look WSO2 para todos los proveedores definidos en el YAML
 cols = st.columns(len(provider_keys))
 for idx, prov in enumerate(provider_keys):
     cols[idx].markdown(f"""
-    <div style='color:#FF5000;font-size:1.1rem;font-weight:bold;'>Llamadas correctas a {prov}: {st.session_state.get(f'{prov}_success', 0)}</div>
-    <div style='color:#d32f2f;font-size:1.1rem;font-weight:bold;'>Llamadas erróneas a {prov}: {st.session_state.get(f'{prov}_error', 0)}</div>
+    <div style='color:#FF5000;font-size:1.1rem;font-weight:bold;'>{t('success_count', provider=prov, count=st.session_state.get(f'{prov}_success', 0))}</div>
+    <div style='color:#d32f2f;font-size:1.1rem;font-weight:bold;'>{t('error_count', provider=prov, count=st.session_state.get(f'{prov}_error', 0))}</div>
     """, unsafe_allow_html=True)
 
 st.markdown("<hr style='margin:20px 0 20px 0;border:1px solid #eee;'>", unsafe_allow_html=True)
 
+
 # Sección de interacción
-titulo_interaccion = "<h3 style='color:#232323;margin-bottom:10px;'>Selecciona el proveedor y haz tu pregunta</h3>"
+titulo_interaccion = f"<h3 style='color:#232323;margin-bottom:10px;'>{t('select_and_ask')}</h3>"
 st.markdown(titulo_interaccion, unsafe_allow_html=True)
 
 # Select dinámico de proveedores y etiquetas
-provider = st.selectbox("Selecciona el proveedor:", provider_keys, index=0)
+provider = st.selectbox(t('select_provider'), provider_keys, index=0)
 provider_config = config["providers"][provider]
 
 # Acceso a los valores de configuración
@@ -116,17 +135,20 @@ CONSUMER_KEY = provider_config["CONSUMER_KEY"]
 CONSUMER_SECRET = provider_config["CONSUMER_SECRET"]
 WSO2_GATEWAY_URL = provider_config["WSO2_GATEWAY_URL"]
 
-question_label = f"Pregunta para {provider}"
-answer_label = f"Respuesta de {provider}"
+
+
+question_label = t('ask_question', provider=provider)
+answer_label = t('response_from', provider=provider)
 
 model = provider_config.get("MODEL", "")
 
-default_question = "¿quién eres tú?"
+
+default_question = t('default_question')
 user_question = st.text_area(question_label, value=default_question, height=100)
 
 st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 
-if st.button("Enviar pregunta", type="primary"):
+if st.button(t('send'), type="primary"):
     # Paso 1: Obtener el access token automáticamente
     try:
         token_data = {
@@ -145,13 +167,13 @@ if st.button("Enviar pregunta", type="primary"):
             access_token = token_response.json().get("access_token")
             if not access_token:
                 print("[ERROR] No access token in response!")
-                st.error("No se pudo obtener el access token.")
-                st.error(f"Respuesta del servidor: {token_response.text}")
+                st.error(t('no_access_token'))
+                st.error(f"Server response: {token_response.text}")
                 st.stop()
         else:
             print(f"[ERROR] Token request failed: {token_response.text}")
-            st.error(f"Error al obtener token. Status: {token_response.status_code}")
-            st.error(f"Respuesta del servidor: {token_response.text}")
+            st.error(t('token_error', status=token_response.status_code))
+            st.error(f"Server response: {token_response.text}")
             st.stop()
         # Paso 2: Hacer la llamada a la API con el token obtenido
         headers = {
@@ -212,7 +234,7 @@ if st.button("Enviar pregunta", type="primary"):
                         assessments = error_json["message"]["assessments"]
                         if isinstance(assessments, dict) and "invalidUrls" in assessments:
                             invalid_urls = ", ".join(assessments["invalidUrls"])
-                            reason = f"Se ha bloqueado la respuesta por contener una URL inválida o no accesible: {invalid_urls}"
+                            reason = t('blocked_url', urls=invalid_urls)
                         elif isinstance(assessments, str):
                             reason = assessments
                     # Si no hay assessments, intenta mostrar actionReason o el mensaje original
@@ -234,12 +256,12 @@ if st.button("Enviar pregunta", type="primary"):
                     st.session_state[f"last_response_{provider}"] = api_response.text
             except Exception as ex:
                 print(f"[ERROR] Exception parsing API error JSON: {ex}")
-                st.session_state[f"last_response_{provider}"] = "Error desconocido."
+                st.session_state[f"last_response_{provider}"] = t('unknown_error')
             st.rerun()
     except Exception as e:
         print(f"[ERROR] Exception in main request flow: {e}")
         st.session_state[f"{provider}_error"] += 1
-        st.session_state[f"last_response_{provider}"] = f"Error al realizar la solicitud a la API: {str(e)}"
+        st.session_state[f"last_response_{provider}"] = t('api_request_error', error=str(e))
         st.rerun()
 
 # Mostrar la última respuesta si existe (después del botón)
