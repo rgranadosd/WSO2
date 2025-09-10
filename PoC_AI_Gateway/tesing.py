@@ -223,6 +223,8 @@ if st.button("Enviar pregunta", type="primary"):
                             and "actionReason" in error_json["message"]
                         ):
                             reason = error_json["message"]["actionReason"]
+                        elif "message" in error_json and "description" in error_json:
+                            reason = str(error_json["message"] +  " : " + error_json["description"])
                         elif "message" in error_json:
                             reason = str(error_json["message"])
                         else:
