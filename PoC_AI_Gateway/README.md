@@ -8,8 +8,10 @@ This application is a Streamlit interface to interact with LLM models (such as O
 
 ## Installation
 1. Clone the repository or download the files.
-2. Install the dependencies:
+2. Create a virtual environment and install the dependencies:
    ```bash
+   python -m venv venv
+   source venv/bin/activate
    pip install -r requirements.txt
    ```
 3. Configure the `config.yaml` file (see below).
