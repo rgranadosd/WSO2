@@ -137,3 +137,9 @@ carbon.log
 *.pid
 *.out
 *.err
+CLAUDE.md
+frontend
+backend
+PoC_AI_Gateway/README_NEW_ARCHITECTURE.md
+PoC_AI_Gateway/start_backend.sh
+PoC_AI_Gateway/start_frontend.sh
