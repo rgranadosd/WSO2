@@ -471,59 +471,64 @@ class ShopifyPlugin:
 
     @kernel_function(name="find_product_by_name", description="Busca un producto por su nombre y devuelve su ID.")  # <<< SEMANTIC KERNEL
     def find_product_by_name(self, product_name: str) -> dict:
-        """Busca un producto por su nombre y devuelve información completa, con tolerancia a errores tipográficos"""
+        """Busca un producto por nombre, descripción o etiquetas con tolerancia a errores."""
         if DEBUG_MODE:
             print(f"\n[EJECUTANDO] → find_product_by_name() buscando '{product_name}'")
         data = self._make_api_call("GET", "/products.json")
-        
+
         if "products" in data:
             products_data = data["products"]
-            product_name_lower = product_name.lower().strip()
-            
-            # 1. Buscar coincidencia exacta primero
+            query = product_name.lower().strip()
+
+            # Función auxiliar para texto buscable: título + descripción sin HTML + tags
+            import re as _re
+            def build_search_text(p: dict) -> str:
+                title = (p.get('title') or '').lower()
+                body = (p.get('body_html') or '')
+                body = _re.sub(r'<[^>]+>', ' ', body)  # strip HTML
+                body = body.lower()
+                tags = (p.get('tags') or '').lower()
+                return f"{title} {body} {tags}".strip()
+
+            # 1) Coincidencia exacta por título
             for product in products_data:
-                if product['title'].lower() == product_name_lower:
+                if (product.get('title') or '').lower() == query:
                     price = product.get('variants', [{}])[0].get('price', 'N/A')
                     if DEBUG_MODE:
-                        print(f"   {Colors.green('OK')} Coincidencia exacta encontrada: {product['title']}")
-                    return {
-                        'found': True,
-                        'id': str(product['id']),
-                        'name': product['title'],
-                        'price': price
-                    }
-            
-            # 2. Buscar coincidencia parcial (el nombre buscado está dentro del título)
+                        print(f"   {Colors.green('OK')} Coincidencia exacta (título): {product['title']}")
+                    return {'found': True, 'id': str(product['id']), 'name': product['title'], 'price': price}
+
+            # 2) Coincidencia parcial en título/descripcion/tags
             for product in products_data:
-                if product_name_lower in product['title'].lower():
+                searchable = build_search_text(product)
+                if query in searchable:
                     price = product.get('variants', [{}])[0].get('price', 'N/A')
                     if DEBUG_MODE:
-                        print(f"   {Colors.green('OK')} Coincidencia parcial encontrada: {product['title']}")
-                    return {
-                        'found': True,
-                        'id': str(product['id']),
-                        'name': product['title'],
-                        'price': price
-                    }
-            
-            # 3. Buscar por similitud de palabras (tolerancia a errores tipográficos)
-            import difflib
+                        print(f"   {Colors.green('OK')} Coincidencia parcial: {product['title']}")
+                    return {'found': True, 'id': str(product['id']), 'name': product['title'], 'price': price}
+
+            # 3) Similitud flexible (sobre título y texto combinado)
+            import difflib as _difflib
             best_match = None
-            best_ratio = 0.6  # Umbral mínimo de similitud (60%)
-            
+            best_ratio = 0.55  # Umbral algo más permisivo
             for product in products_data:
-                product_title_lower = product['title'].lower()
-                # Calcular similitud entre nombres
-                ratio = difflib.SequenceMatcher(None, product_name_lower, product_title_lower).ratio()
-                
-                if ratio > best_ratio:
-                    best_ratio = ratio
+                title = (product.get('title') or '').lower()
+                ratio_title = _difflib.SequenceMatcher(None, query, title).ratio()
+                if ratio_title > best_ratio:
+                    best_ratio = ratio_title
                     best_match = product
-            
+                    continue
+                # probar también sobre el texto combinado (capado a 256 chars)
+                combined = build_search_text(product)[:256]
+                ratio_combined = _difflib.SequenceMatcher(None, query, combined).ratio()
+                if ratio_combined > best_ratio:
+                    best_ratio = ratio_combined
+                    best_match = product
+
             if best_match:
                 price = best_match.get('variants', [{}])[0].get('price', 'N/A')
                 if DEBUG_MODE:
-                    print(f"   {Colors.yellow('SUGERENCIA')} Producto similar encontrado ({best_ratio:.1%} similitud): {best_match['title']}")
+                    print(f"   {Colors.yellow('SUGERENCIA')} Similaridad {best_ratio:.0%}: {best_match['title']}")
                 return {
                     'found': True,
                     'id': str(best_match['id']),
@@ -532,17 +537,16 @@ class ShopifyPlugin:
                     'similarity': best_ratio,
                     'suggestion': True
                 }
-            
-            # 4. Si no hay coincidencias, mostrar productos disponibles para ayudar al usuario
+
+            # 4) No encontrado: sugerir primeros productos para ayudar
             if DEBUG_MODE:
                 print(f"   {Colors.red('ERROR')} No se encontró '{product_name}'")
-            if DEBUG_MODE:
                 print(f"   {Colors.yellow('SUGERENCIA')} Productos disponibles:")
-                for i, product in enumerate(products_data[:5]):  # Mostrar solo los primeros 5
-                    print(f"     - {product['title']}")
+                for i, product in enumerate(products_data[:5]):
+                    print(f"     - {product.get('title','(sin título)')}")
                 if len(products_data) > 5:
                     print(f"     ... y {len(products_data) - 5} productos más")
-        
+
         return {'found': False, 'error': 'Producto no encontrado'}
 
     @kernel_function(name="update_product_price_with_math", description="Actualiza el precio de un producto aplicando una operación matemática.")  # <<< SEMANTIC KERNEL
@@ -582,14 +586,29 @@ class ShopifyPlugin:
         elif operation == 'subtract':
             new_price = current_price - value
             operation_text = f"restando ${value}"
+        elif operation == 'divide':
+            if value == 0:
+                return f"{Colors.red('ERROR')} División por cero"
+            new_price = current_price / value
+            operation_text = f"dividiendo entre {value}"
+        elif operation == 'multiply':
+            new_price = current_price * value
+            operation_text = f"multiplicando por {value}"
+        elif operation == 'percent_reduce':
+            new_price = current_price * (1 - (value / 100.0))
+            operation_text = f"reduciendo {value}%"
+        elif operation == 'percent_increase':
+            new_price = current_price * (1 + (value / 100.0))
+            operation_text = f"incrementando {value}%"
         else:
             return f"{Colors.red('ERROR')} Operación '{operation}' no soportada"
         
         if DEBUG_MODE:
             print(f"   Calculando: ${current_price} {operation_text} = ${new_price}")
         
-        # Actualizar con el nuevo precio calculado
-        result = self.update_product_price(product_id, str(new_price))
+        # Actualizar con el nuevo precio calculado (formateado a 2 decimales)
+        formatted_price = f"{new_price:.2f}"
+        result = self.update_product_price(product_id, formatted_price)
         
         # Detectar éxito con los nuevos patrones
         success_patterns = ["[OK] Éxito", "OK] Éxito", "Éxito confirmado", "se ha actualizado"]
@@ -693,16 +712,18 @@ FORBIDDEN: Inventing information, confirming operations without real verificatio
         # Triggers mejorados para detectar intenciones (bilingüe)
         triggers = {
             'list': ['productos', 'lista', 'catálogo', 'disponible', 'tienes', 'mostrar', 'ver', 'dame',
-                     'barata', 'barato', 'cara', 'caro', 'precio', 'cuesta', 'económico', 'costoso',
+                     'barata', 'barato', 'cara', 'caro', 'cuesta', 'económico', 'costoso',
                      'tabla', 'tablas', 'opciones', 'alternativas', 'oferta',
                      'products', 'list', 'catalog', 'available', 'have', 'show', 'display', 'give',
-                     'cheap', 'expensive', 'price', 'cost', 'affordable', 'costly',
+                     'cheap', 'expensive', 'cost', 'affordable', 'costly',
                      'table', 'options', 'alternatives', 'offer'],
             'count': ['cuántos', 'cantidad', 'número', 'total', 'how many', 'count', 'number', 'total'],
             'sort_asc': ['menor', 'mayor', 'ascendente', 'descendente', 'ordenar', 'orden',
                         'lowest', 'highest', 'ascending', 'descending', 'sort', 'order'],
             'update_price': ['actualizar', 'actualiza', 'cambiar', 'cambio', 'modificar', 'modifica',
-                           'update', 'change', 'modify', 'set'],
+                           'añade', 'añadir', 'suma', 'sumar', 'resta', 'restar',
+                           'aumenta', 'aumentar', 'incrementa', 'incrementar', 'sube', 'subir',
+                           'update', 'change', 'modify', 'set', 'add', 'subtract'],
             'revert_price': ['vuelve', 'restaurar', 'deshacer', 'anterior', 'original', 'revertir', 'dejarlo',
                            'revert', 'restore', 'undo', 'previous', 'original', 'back']
         }
@@ -718,7 +739,14 @@ FORBIDDEN: Inventing information, confirming operations without real verificatio
         # CORRECCIÓN: Detección más amplia y precisa de UPDATE_PRICE (bilingüe)
         update_keywords = ['actualizar', 'actualiza', 'cambiar', 'cambio', 'modificar', 'modifica',
                           'update', 'change', 'modify', 'set']
-        math_keywords = ['añadiendo', 'añadiendole', 'sumando', 'sumandole', 'agregando', 'agregandole', 'restando', 'restandole', 'quitando', 'quitandole']
+        math_keywords = [
+            'añadiendo', 'añadiendole', 'añade', 'añadir', 'sumando', 'sumandole', 'agregando', 'agregandole',
+            'restando', 'restandole', 'quitando', 'quitandole', 'suma', 'sumar', 'add',
+            'resta', 'restar', 'subtract', 'quita', 'quitar',
+            'mitad', 'a la mitad', 'half', 'reduce', 'reducir', 'rebaja', 'descuento', '%',
+            'doble', 'al doble', 'duplicar', 'double', 'twice',
+            'aumenta', 'aumentar', 'incrementa', 'incrementar', 'sube', 'subir'
+        ]
         price_patterns = [
             r'a\s+[\$€]?\d+',                    # "a 1000"
             r'precio\s+[\$€]?\d+',               # "precio 1000" 
@@ -726,6 +754,19 @@ FORBIDDEN: Inventing information, confirming operations without real verificatio
             r'to\s+[\$€]?\d+',                   # "to 25"
             r'[\$€]\s*\d+',                      # "$1000"
             r'añadiendo(?:le)?\s+\d+',           # "añadiendo 1000" o "añadiendole 1000"
+            r'añade\s+\d+',                      # "añade 10"
+            r'añadir\s+\d+',                     # "añadir 20"
+            r'suma\s+\d+',                       # "suma 50"
+            r'sumar\s+\d+',                      # "sumar 30"
+            r'resta\s+\d+',                      # "resta 40"
+            r'restar\s+\d+',                     # "restar 25"
+            r'aumenta\s+(?:un\s+)?\d+\s+por\s+ciento',  # "aumenta un 5 por ciento"
+            r'aumenta\s+(?:un\s+)?\d+%',  # "aumenta un 5%"
+            r'incrementa\s+(?:un\s+)?\d+\s+por\s+ciento',  # "incrementa un 10 por ciento"
+            r'incrementa\s+(?:un\s+)?\d+%',  # "incrementa un 10%"
+            r'incrementa\s+(?:el\s+precio\s+(?:de|del)\s+)?\w+(?:\s+\w+)*\s+(?:un\s+)?\d+%',  # "incrementa el precio de X un Y%"
+            r'sube\s+(?:un\s+)?\d+\s+por\s+ciento',  # "sube un 15 por ciento"
+            r'sube\s+(?:un\s+)?\d+%',  # "sube un 15%"
             r'sumando(?:le)?\s+\d+',             # "sumando 500" o "sumandole 500"
             r'agregando(?:le)?\s+\d+',           # "agregando 200" o "agregandole 200"
             r'restando(?:le)?\s+\d+',            # "restando 100" o "restandole 100"
@@ -738,7 +779,23 @@ FORBIDDEN: Inventing information, confirming operations without real verificatio
         has_math_keyword = any(keyword in user_input_lower for keyword in math_keywords)
         has_price_pattern = any(re.search(pattern, user_input_lower) for pattern in price_patterns)
         
-        if (has_update_keyword or has_math_keyword) and has_price_pattern:
+        # Atajo: "a la mitad" o "half" => dividir por 2
+        if (has_update_keyword and ('a la mitad' in user_input_lower or 'mitad' in user_input_lower or 'half' in user_input_lower)):
+            execute_function = 'update_price'
+            math_operation = 'divide'
+            math_value = 2
+            if DEBUG_MODE:
+                print("   Operación detectada: dividir por 2 (mitad)")
+        
+        # Atajo: "al doble" o "duplicar" => multiplicar por 2
+        if (has_update_keyword and ('al doble' in user_input_lower or 'doble' in user_input_lower or 'duplicar' in user_input_lower or 'double' in user_input_lower or 'twice' in user_input_lower)):
+            execute_function = 'update_price'
+            math_operation = 'multiply'
+            math_value = 2
+            if DEBUG_MODE:
+                print("   Operación detectada: multiplicar por 2 (doble)")
+
+        if (has_update_keyword or has_math_keyword) and (has_price_pattern or math_operation):
             execute_function = 'update_price'
             if DEBUG_MODE:
                 print("   DETECTADO: UPDATE_PRICE")
@@ -753,12 +810,38 @@ FORBIDDEN: Inventing information, confirming operations without real verificatio
             math_patterns = {
                 'add': [
                     r'añadiendo(?:le)?\s+(\d+\.?\d*)', 
+                    r'añade\s+(\d+\.?\d*)',
+                    r'añadir\s+(\d+\.?\d*)',
                     r'sumando(?:le)?\s+(\d+\.?\d*)', 
-                    r'agregando(?:le)?\s+(\d+\.?\d*)'
+                    r'agregando(?:le)?\s+(\d+\.?\d*)',
+                    r'suma\s+(\d+\.?\d*)',
+                    r'sumar\s+(\d+\.?\d*)',
+                    r'add\s+(\d+\.?\d*)'
                 ],
                 'subtract': [
                     r'restando(?:le)?\s+(\d+\.?\d*)', 
-                    r'quitando(?:le)?\s+(\d+\.?\d*)'
+                    r'quitando(?:le)?\s+(\d+\.?\d*)',
+                    r'resta\s+(\d+\.?\d*)',
+                    r'restar\s+(\d+\.?\d*)',
+                    r'quita\s+(\d+\.?\d*)',
+                    r'quitar\s+(\d+\.?\d*)',
+                    r'subtract\s+(\d+\.?\d*)'
+                ],
+                'divide': [r'a\s+la\s+mitad', r'\bmitad\b', r'\bhalf\b'],
+                'multiply': [r'al\s+doble', r'\bdoble\b', r'duplicar', r'\bdouble\b', r'\btwice\b'],
+                'percent_reduce': [r'(?:reduce|reducir|rebaja|descuento)\s+(\d+\.?\d*)%', r'(\b\d+\.?\d*%\b)'],
+                'percent_increase': [
+                    r'(?:incrementa|incrementar|sube|aumenta|increase|raise)\s+(?:un\s+)?(\d+\.?\d*)%',
+                    r'aumenta\s+(?:el\s+precio\s+)?(?:en\s+)?(?:un\s+)?(\d+\.?\d*)%',
+                    r'incrementa\s+(?:el\s+precio\s+)?(?:en\s+)?(?:un\s+)?(\d+\.?\d*)%',
+                    r'sube\s+(?:el\s+precio\s+)?(?:en\s+)?(?:un\s+)?(\d+\.?\d*)%',
+                    r'aumenta\s+(?:un\s+)?(\d+\.?\d*)\s+por\s+ciento',
+                    r'incrementa\s+(?:un\s+)?(\d+\.?\d*)\s+por\s+ciento',
+                    r'sube\s+(?:un\s+)?(\d+\.?\d*)\s+por\s+ciento',
+                    r'aumenta\s+(?:un\s+)?(\d+\.?\d*)%',
+                    r'incrementa\s+(?:un\s+)?(\d+\.?\d*)%',
+                    r'sube\s+(?:un\s+)?(\d+\.?\d*)%',
+                    r'incrementa\s+(?:el\s+precio\s+(?:de|del)\s+)?\w+(?:\s+\w+)*\s+(?:un\s+)?(\d+\.?\d*)%'  # "incrementa el precio de X un Y%"
                 ]
             }
             
@@ -767,7 +850,10 @@ FORBIDDEN: Inventing information, confirming operations without real verificatio
                     match = re.search(pattern, user_input_lower)
                     if match:
                         math_operation = operation
-                        math_value = float(match.group(1))
+                        if operation == 'divide':
+                            math_value = 2.0
+                        else:
+                            math_value = float(match.group(1))
                         if DEBUG_MODE:
                             print(f"   Operación matemática detectada: {operation} {math_value}")
                         break
@@ -797,9 +883,16 @@ FORBIDDEN: Inventing information, confirming operations without real verificatio
                 # Buscar nombre de producto con patrones mejorados y más específicos (bilingüe)
                 name_patterns = [
                     # Patrones en español
-                    r'(?:actualiza|actualizar|modifica|modificar|cambiar|cambio)\s+(?:el\s+precio\s+(?:de|del)\s+)?(.+?)\s+(?:a|añadiendo|sumando|agregando|restando|quitando)\s+[\d.]+',
+                    r'(?:actualiza|actualizar|modifica|modificar|cambiar|cambio)\s+(?:el\s+precio\s+(?:de|del)\s+)?(.+?)\s+(?:a|añadiendo|sumando|agregando|restando|quitando|suma|sumar|resta|restar)\s+[\d.]+',
+                    r'(?:actualiza|actualizar|modifica|modificar|cambiar|cambio)\s+(?:el\s+precio\s+(?:de|del)\s+)?(.+?)\s+(?:a\s+la\s+mitad|al\s+doble|duplicar)',
+                    r'(?:aumenta|aumentar|incrementa|incrementar|sube|subir)\s+(?:un\s+)?\d+\s+por\s+ciento\s+(?:el\s+precio\s+(?:de|del)\s+)?(.+?)$',
+                    r'(?:aumenta|aumentar|incrementa|incrementar|sube|subir)\s+(?:un\s+)?\d+%\s+(?:el\s+precio\s+(?:de|del)\s+)?(.+?)$',
+                    r'(?:incrementa|incrementar)\s+(?:el\s+precio\s+(?:de|del)\s+)?(.+?)\s+(?:un\s+)?\d+%$',
                     r'precio\s+(?:de|del)\s+(.+?)\s+a\s+[\d.]+',
-                    r'(.+?)\s+(?:añadiendo|sumando|agregando|restando|quitando)\s+[\d.]+',
+                    r'(.+?)\s+(?:añadiendo|sumando|agregando|restando|quitando|suma|sumar|resta|restar)\s+[\d.]+',
+                    r'(?:suma|sumar|add)\s+[\d.]+\s*[\$€]?\s*(?:al\s+precio\s+(?:de|del)\s+|a\s+(?:la\s+)?)?(.+?)$',
+                    r'(?:resta|restar|subtract)\s+[\d.]+\s*[\$€]?\s*(?:al\s+precio\s+(?:de|del)\s+|a\s+(?:la\s+)?)?(.+?)$',
+                    r'(?:añade|añadir|add)\s+[\d.]+\s*[\$€]?\s*(?:al\s+precio\s+(?:de|del)\s+|a\s+(?:la\s+)?)?(.+?)$',
                     # Patrones en inglés
                     r'(?:update|change|modify|set)\s+(.+?)\s+(?:price\s+)?to\s+[\d.]+',  # "update Gift Card price to 25"
                     r'(?:update|change|modify)\s+(.+?)\s+(?:adding|subtracting)\s+[\d.]+',  # "update Gift Card adding 10"
@@ -950,7 +1043,7 @@ Responde SOLO con los productos reales listados arriba.'''
 
             elif execute_function == 'update_price':
                 # Detectar éxito con los nuevos patrones de Colors
-                success_patterns = ["[OK] Éxito", "OK] Éxito", "Éxito confirmado", "se ha actualizado"]
+                success_patterns = ["[OK] Éxito", "OK] Éxito", "Éxito confirmado", "se ha actualizado", "Operación exitosa", "[32mOK[0m", "actualizado de $", "actualizado a $"]
                 if any(pattern in shopify_data for pattern in success_patterns):
                     enhanced_prompt = f'''ACTUALIZACIÓN EXITOSA CONFIRMADA:
 {shopify_data}
